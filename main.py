@@ -25,13 +25,22 @@ load_dotenv()
 
 # Initialize components
 def initialize_components():
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len
-    )
-    return embeddings, text_splitter
+    try:
+        embeddings = HuggingFaceEmbeddings(
+            model_name="all-MiniLM-L6-v2",
+            cache_folder="./model_cache",  # Specify a local cache directory
+            encode_kwargs={'normalize_embeddings': True}
+        )
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len
+        )
+        return embeddings, text_splitter
+    except OSError as e:
+        st.error(f"Error initializing components: {str(e)}")
+        st.info("Please check your internet connection and try again.")
+        return None, None
 
 # Document processing functions
 def extract_text_from_file(uploaded_file):
@@ -127,6 +136,12 @@ def main():
         layout="wide"
     )
     
+    components = initialize_components()
+    if components is None:
+        st.stop()
+    
+    embeddings, text_splitter = components
+    
     # Check for Tesseract OCR quietly
     tesseract_available = True
     try:
@@ -197,7 +212,6 @@ def main():
     # Process document if new file uploaded
     if uploaded_file and (st.session_state.processed_file != uploaded_file.name):
         with st.spinner("Processing document..."):
-            embeddings, text_splitter = initialize_components()
             vector_store = process_document(uploaded_file, text_splitter, embeddings)
             
             if vector_store:
